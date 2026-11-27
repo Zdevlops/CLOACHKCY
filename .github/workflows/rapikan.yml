@@ -1,0 +1,56 @@
+name: Auto Rapikan & Ekstrak ZIP CLOACHY
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rapikan:
+    name: Auto Ekstrak & Rapikan Repo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Ekstrak ZIP Tanpa Menghapus File Asli
+        run: |
+          set -e
+          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "File ZIP tidak ditemukan di root."
+            exit 0
+          fi
+
+          rm -rf /tmp/cloachy_unzip
+          mkdir -p /tmp/cloachy_unzip
+          unzip -oq "$ZIP_FILE" -d /tmp/cloachy_unzip
+
+          SRC_DIR="/tmp/cloachy_unzip"
+          NESTED_APP=$(find /tmp/cloachy_unzip -mindepth 2 -maxdepth 2 -type d -name "app" | head -n 1)
+          if [ -n "$NESTED_APP" ]; then
+            SRC_DIR=$(dirname "$NESTED_APP")
+          fi
+
+          cp -rf "$SRC_DIR"/. ./
+          rm -rf /tmp/cloachy_unzip
+
+      - name: Commit & Push Hasil Ekstrak ke Main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -- .github/workflows/ 2>/dev/null || true
+          git add -A
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: ekstrak proyek cloachy dan susun struktur"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "Semua file sudah ada dan rapi."
+          fi
