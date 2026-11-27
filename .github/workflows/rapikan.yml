@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Ekstrak ZIP Tanpa Menghapus File Asli
+      - name: Ekstrak ZIP Tanpa Menyentuh Folder Workflows
         run: |
           set -e
           ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
@@ -39,6 +39,8 @@ jobs:
             SRC_DIR=$(dirname "$NESTED_APP")
           fi
 
+          # Hapus folder .github dari hasil ekstrak agar tidak ditolak git push
+          rm -rf "$SRC_DIR/.github"
           cp -rf "$SRC_DIR"/. ./
           rm -rf /tmp/cloachy_unzip
 
@@ -46,7 +48,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -- .github/workflows/ 2>/dev/null || true
           git add -A
           if ! git diff --staged --quiet; then
             git commit -m "chore: ekstrak proyek cloachy dan susun struktur"
