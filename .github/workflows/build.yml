@@ -1,0 +1,41 @@
+name: Build CLOACHY APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Release & Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Debug & Release APK
+        run: gradle assembleDebug assembleRelease --no-daemon
+
+      - name: Rename Output APKs
+        run: |
+          mkdir -p release-apks
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apks/Cloachy-v1.0.0-debug.apk \;
+          find app/build/outputs/apk/release -name "*.apk" -exec cp {} release-apks/Cloachy-v1.0.0-release.apk \;
+
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cloachy-v1.0.0-APKs
+          path: release-apks/*.apk
