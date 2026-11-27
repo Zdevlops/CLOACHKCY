@@ -1,0 +1,2 @@
+-keep class com.zdevlops.cloachy.model.** { *; }
+-keep class rikka.shizuku.** { *; }
