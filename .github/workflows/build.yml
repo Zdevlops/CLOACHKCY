@@ -18,6 +18,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
 jobs:
   build:
     name: Build APK
@@ -28,19 +32,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK packages
+      - name: Pastikan Android SDK tersedia
         run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" >/dev/null
+          set -e
+          if [ ! -d "$ANDROID_HOME" ]; then
+            echo "SDK tidak ditemukan, gunakan sdkmanager bawaan..."
+            export ANDROID_HOME="$HOME/android-sdk"
+            export ANDROID_SDK_ROOT="$ANDROID_HOME"
+            mkdir -p "$ANDROID_HOME/cmdline-tools"
+          fi
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME" || true
+          (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1) || true
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
