@@ -89,14 +89,14 @@ enum class AppUpdateStage {
 }
 
 data class AppUpdateInfo(
-    val currentVersion: String = "1.0.0",
-    val latestVersion: String = "1.0.0",
-    val releaseNotes: String = "CLOACHY v1.0.0 Release stabil.",
+    val currentVersion: String = "1.0.1",
+    val latestVersion: String = "1.0.1",
+    val releaseNotes: String = "CLOACHY v1.0.1 Release stabil.",
     val downloadUrl: String = "",
     val publishedAt: String = "",
     val stage: AppUpdateStage = AppUpdateStage.IDLE,
     val downloadProgress: Int = 0,
-    val statusMessage: String = "Versi v1.0.0 (Release) terpasang"
+    val statusMessage: String = "Versi v1.0.1 (Release) terpasang"
 )
 
 data class DeviceSpecs(
