@@ -16,6 +16,15 @@ class GpuGuardService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var lastDowngradeTs = 0L
     private var lastLockVerifyTs = 0L
+    private var lastAlertLevel = GpuAlertLevel.NONE
+    private var consecutiveHotSamples = 0
+
+    companion object {
+        private const val POLL_INTERVAL_MS = 3000L
+        private const val LOCK_VERIFY_INTERVAL_MS = 15_000L
+        private const val DOWNGRADE_COOLDOWN_MS = 60_000L
+        private const val HOT_SAMPLES_REQUIRED = 3
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -29,18 +38,22 @@ class GpuGuardService : Service() {
     private fun startMonitoringLoop() {
         serviceScope.launch {
             while (isActive) {
-                delay(2500L)
+                delay(POLL_INTERVAL_MS)
                 checkScheduledCacheReset()
 
                 val prefs = getSharedPreferences("cloachy_guard_prefs", Context.MODE_PRIVATE)
                 val guardEnabled = prefs.getBoolean("gpu_auto_guard_enabled", true)
                 val telemetry = SystemTelemetryMonitor.sampleLiveTelemetry(this@GpuGuardService, null)
-                if (!telemetry.isRobloxActive) continue
+                if (!telemetry.isRobloxActive) {
+                    consecutiveHotSamples = 0
+                    lastAlertLevel = GpuAlertLevel.NONE
+                    continue
+                }
 
                 val now = System.currentTimeMillis()
 
-                // Watchdog: setiap 6 detik pastikan kunci grafik & FFlag tidak tertimpa saat in-game
-                if (now - lastLockVerifyTs >= 6000L) {
+                // Watchdog: pastikan kunci grafik & FFlag tidak tertimpa saat in-game
+                if (now - lastLockVerifyTs >= LOCK_VERIFY_INTERVAL_MS) {
                     lastLockVerifyTs = now
                     val settings = FflagRepository.loadEngineSettings(this@GpuGuardService)
                     val custom = FflagRepository.loadCustomFlags(this@GpuGuardService)
@@ -54,15 +67,38 @@ class GpuGuardService : Service() {
                 }
 
                 if (!guardEnabled) continue
-                if (now - lastDowngradeTs < 20_000L) continue
 
-                if (telemetry.gpuAlertLevel == GpuAlertLevel.MAX_100) {
-                    lastDowngradeTs = now
-                    applyAutoDowngrade(isMax100 = true, gpuPercent = telemetry.gpuLoadPercent)
-                } else if (telemetry.gpuAlertLevel == GpuAlertLevel.HIGH_80) {
-                    lastDowngradeTs = now
-                    applyAutoDowngrade(isMax100 = false, gpuPercent = telemetry.gpuLoadPercent)
+                val level = telemetry.gpuAlertLevel
+                if (level == GpuAlertLevel.NONE) {
+                    consecutiveHotSamples = 0
+                    lastAlertLevel = GpuAlertLevel.NONE
+                    continue
                 }
+
+                // Butuh beberapa sampel berturut-turut agar lonjakan sesaat tidak memicu downgrade
+                consecutiveHotSamples++
+                if (consecutiveHotSamples < HOT_SAMPLES_REQUIRED) continue
+                consecutiveHotSamples = 0
+
+                if (now - lastDowngradeTs < DOWNGRADE_COOLDOWN_MS) continue
+
+                val currentSettings = FflagRepository.loadEngineSettings(this@GpuGuardService)
+                if (level == GpuAlertLevel.MAX_100 && currentSettings.graphicsQuality <= 1) {
+                    // Sudah di level terendah, tidak perlu downgrade berulang
+                    lastAlertLevel = level
+                    continue
+                }
+                if (level == GpuAlertLevel.HIGH_80 && currentSettings.graphicsQuality <= 8) {
+                    lastAlertLevel = level
+                    continue
+                }
+
+                lastDowngradeTs = now
+                lastAlertLevel = level
+                applyAutoDowngrade(
+                    isMax100 = level == GpuAlertLevel.MAX_100,
+                    gpuPercent = telemetry.gpuLoadPercent
+                )
             }
         }
     }

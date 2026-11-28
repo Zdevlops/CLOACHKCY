@@ -280,16 +280,21 @@ fun CloachyApp(
         }
     }
 
-    val telemetry = remember(pollTick, lastAutoSummary) {
-        SystemTelemetryMonitor.sampleLiveTelemetry(context, lastAutoSummary)
-    }
+    var telemetry by remember { mutableStateOf(TelemetryState()) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(3000L)
+            val sampled = withContext(Dispatchers.IO) {
+                SystemTelemetryMonitor.sampleLiveTelemetry(context, lastAutoSummary)
+            }
+            telemetry = sampled
             pollTick++
             hasOverlayPermission = Settings.canDrawOverlays(context)
-            envStatus = ShizukuRobloxManager.checkEnvironment(context)
+
+            val newEnv = withContext(Dispatchers.IO) {
+                ShizukuRobloxManager.checkEnvironment(context)
+            }
+            envStatus = newEnv
 
             val serviceTs = guardPrefs.getLong("last_auto_downgrade_ts", 0L)
             if (serviceTs > lastHandledServiceTs) {
@@ -297,15 +302,17 @@ fun CloachyApp(
                 lastAutoSummary = guardPrefs.getString("last_auto_downgrade_msg", null)
                 engineSettings = FflagRepository.loadEngineSettings(context)
                 val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+                val serviceLevel = guardPrefs.getInt("last_auto_downgrade_level", 1)
                 sessionHistory = listOf(
                     SessionRecord(
                         gameName = "Auto GPU Guard Trigger",
-                        peakLoad = "Auto-Adjusted",
-                        resultSummary = "Grafik disesuaikan otomatis",
+                        peakLoad = "GPU ${sampled.gpuLoadPercent}% · Turun ke Lv. $serviceLevel",
+                        resultSummary = lastAutoSummary ?: "Grafik disesuaikan otomatis",
                         timestampLabel = timeStr
                     )
                 ) + sessionHistory.take(9)
             }
+            delay(3000L)
         }
     }
 

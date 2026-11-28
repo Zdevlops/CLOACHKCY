@@ -3,7 +3,20 @@ name: Build CLOACHY APK
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - '**.zip'
+      - '**.md'
+      - 'screenshots/**'
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
+
+concurrency:
+  group: build-cloachy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -19,6 +32,44 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: 'gradle'
 
-      - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" >/dev/null
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build Debug + Release APK
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+      - name: Upload Debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cloachy-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload Release APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cloachy-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

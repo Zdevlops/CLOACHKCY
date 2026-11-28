@@ -21,7 +21,7 @@ import java.net.URL
 
 object AppUpdateManager {
 
-    const val DEFAULT_GITHUB_REPO = "Zdevlops/CLOACHY"
+    const val DEFAULT_GITHUB_REPO = "Zdevlops/CLOACHKCY"
     private const val PREFS_NAME = "cloachy_updater_prefs"
     private const val KEY_AUTO_CHECK = "auto_check_app_update"
     private const val KEY_REPO_SLUG = "github_repo_slug"
@@ -88,7 +88,7 @@ object AppUpdateManager {
                 connectTimeout = 8000
                 readTimeout = 8000
                 setRequestProperty("Accept", "application/vnd.github+json")
-                setRequestProperty("User-Agent", "BLOXMOD-MOBILE/$currentVer")
+                setRequestProperty("User-Agent", "CLOACHY-MOBILE/$currentVer")
             }
 
             val code = conn.responseCode

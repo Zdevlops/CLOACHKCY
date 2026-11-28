@@ -3,6 +3,8 @@ name: Auto Rapikan & Ekstrak ZIP CLOACHY
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - '**.zip'
   workflow_dispatch:
 
 permissions:
@@ -39,7 +41,7 @@ jobs:
             SRC_DIR=$(dirname "$NESTED_APP")
           fi
 
-          # Hapus folder .github dari hasil ekstrak agar tidak ditolak git push
+          # Hapus folder .github dari hasil ekstrak agar tidak menimpa workflow
           rm -rf "$SRC_DIR/.github"
           cp -rf "$SRC_DIR"/. ./
           rm -rf /tmp/cloachy_unzip
